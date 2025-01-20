@@ -8,7 +8,7 @@ import requests
 import streamlit.components.v1 as components
 from manage_requests import show_manage_requests
 from communication import show_communication_page
-from database import init_db, create_request
+from database import DatabaseManager
 from search_users import show_search_users
 
 # Initialize database
@@ -53,13 +53,15 @@ def init_session_state():
         st.session_state.page = "main"
     if 'db_initialized' not in st.session_state:
         st.session_state.db_initialized = False
+    if 'user_data' not in st.session_state:
+        st.session_state.user_data = {}
 
 def main():
     init_session_state()
     
     # Initialize database if not already done
     if not st.session_state.db_initialized:
-        init_db()
+        DatabaseManager.init_db()
         st.session_state.db_initialized = True
     
     # Add some test data if the table is empty
@@ -71,23 +73,31 @@ def main():
             count = c.fetchone()[0]
             if count == 0:
                 # Add sample requests
-                create_request("Medical Supplies", "user1", "John Doe", "5 km")
-                create_request("Food Aid", "user2", "Jane Smith", "3 km")
-                create_request("Transport", "user3", "Mike Johnson", "1 km")
+                DatabaseManager.create_request("Medical Supplies", "user1", "John Doe", "5 km")
+                DatabaseManager.create_request("Food Aid", "user2", "Jane Smith", "3 km")
+                DatabaseManager.create_request("Transport", "user3", "Mike Johnson", "1 km")
         except sqlite3.Error as e:
             st.error(f"Database error: {e}")
         finally:
             conn.close()
     
     # Page routing
-    if st.session_state.page == "main":
-        show_main_page()
-    elif st.session_state.page == "search_users":
-        show_search_users()
-    elif st.session_state.page == "manage_requests":
-        show_manage_requests()
-    elif st.session_state.page == "communication":
-        show_communication_page()
+    if isinstance(st.session_state.page, int):  # Registration flow
+        if st.session_state.page == 1:
+            show_signup_page()
+        elif st.session_state.page == 2:
+            show_resources_page()
+        elif st.session_state.page == 3:
+            show_final_page()
+    else:  # Main navigation
+        if st.session_state.page == "main":
+            show_main_page()
+        elif st.session_state.page == "search_users":
+            show_search_users()
+        elif st.session_state.page == "manage_requests":
+            show_manage_requests()
+        elif st.session_state.page == "communication":
+            show_communication_page()
 
 def save_registration():
     conn = sqlite3.connect('registration.db')
@@ -295,6 +305,61 @@ def show_signup_page():
             st.rerun()
         else:
             st.error("Please fill in all fields")
+
+def show_final_page():
+    st.header("Review and Submit")
+    
+    st.write("Please review your information:")
+    st.write("**Name:** ", st.session_state.user_data.get('name', ''))
+    st.write("**Address:** ", st.session_state.user_data.get('address', ''))
+    st.write("**Resources:** ", st.session_state.user_data.get('resources', ''))
+    st.write("**Services:** ", st.session_state.user_data.get('services', ''))
+    
+    if st.button("Submit"):
+        if DatabaseManager.save_registration(
+            st.session_state.user_data.get('name'),
+            st.session_state.user_data.get('resources'),
+            st.session_state.user_data.get('services'),
+            st.session_state.user_data.get('latitude'),
+            st.session_state.user_data.get('longitude'),
+            st.session_state.user_data.get('address')
+        ):
+            st.success("Registration successful!")
+            st.session_state.page = "main"
+            st.session_state.user_data = {}  # Clear the data
+            st.rerun()
+        else:
+            st.error("Registration failed. Please try again.")
+
+def show_resources_page():
+    st.header("Resources and Services")
+    
+    # Resources selection
+    st.subheader("What resources can you provide?")
+    resources = st.multiselect(
+        "Select resources:",
+        ["Medical Supplies", "Food", "Water", "Shelter", "Clothing", "Transport"],
+        key="resources"
+    )
+    
+    # Services selection
+    st.subheader("What services can you offer?")
+    services = st.multiselect(
+        "Select services:",
+        ["Medical Aid", "Food Distribution", "Transportation", "Housing", "Counseling"],
+        key="services"
+    )
+    
+    if st.button("Next"):
+        if resources or services:  # Allow proceeding if at least one is selected
+            st.session_state.user_data.update({
+                'resources': ','.join(resources),
+                'services': ','.join(services)
+            })
+            st.session_state.page = 3  # Move to final page
+            st.rerun()
+        else:
+            st.error("Please select at least one resource or service")
 
 if __name__ == "__main__":
     main()

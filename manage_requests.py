@@ -1,5 +1,5 @@
 import streamlit as st
-from database import get_all_requests
+from database import DatabaseManager
 
 def show_manage_requests():
     st.title("Managing Requests")
@@ -9,7 +9,7 @@ def show_manage_requests():
         st.subheader("Requests")
         
         # Get requests from database
-        requests = get_all_requests()
+        requests = DatabaseManager.get_all_requests()
         
         if not requests:
             st.info("No active requests at the moment")

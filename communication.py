@@ -1,5 +1,5 @@
 import streamlit as st
-from database import save_message, get_messages, mark_request_complete
+from database import DatabaseManager
 
 def show_communication_page():
     st.header("Communication Page")
@@ -19,7 +19,7 @@ def show_communication_page():
         st.write("**Your name:** " + "Current User")  # Replace with actual user name
     with col2:
         if st.button("Complete"):
-            mark_request_complete(st.session_state.active_request['id'])
+            DatabaseManager.mark_request_complete(st.session_state.active_request['id'])
             st.success("Request marked as complete")
             st.session_state.page = "manage_requests"
             st.rerun()
@@ -29,7 +29,7 @@ def show_communication_page():
     # Chat container
     chat_container = st.container()
     with chat_container:
-        messages = get_messages(st.session_state.active_request['id'])
+        messages = DatabaseManager.get_messages(st.session_state.active_request['id'])
         
         for msg in messages:
             if msg["sender"] == "Current User":  # Replace with actual user check
@@ -41,7 +41,7 @@ def show_communication_page():
     with st.container():
         message_input = st.text_input("Type your message...")
         if st.button("Send") and message_input.strip():
-            save_message(
+            DatabaseManager.save_message(
                 st.session_state.active_request['id'],
                 "current_user_id",  # Replace with actual user ID
                 "Current User",     # Replace with actual user name
