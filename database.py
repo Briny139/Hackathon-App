@@ -2,9 +2,20 @@ import sqlite3
 from datetime import datetime
 import uuid
 
-def init_requests_db():
+def init_db():
     conn = sqlite3.connect('registration.db')
     c = conn.cursor()
+    
+    # Create users table if it doesn't exist
+    c.execute('''CREATE TABLE IF NOT EXISTS users
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  name TEXT NOT NULL,
+                  resources TEXT,
+                  services TEXT,
+                  latitude REAL,
+                  longitude REAL,
+                  address TEXT,
+                  registration_date TIMESTAMP)''')
     
     # Create requests table if it doesn't exist
     c.execute('''CREATE TABLE IF NOT EXISTS requests

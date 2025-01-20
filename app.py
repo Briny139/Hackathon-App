@@ -8,7 +8,7 @@ import requests
 import streamlit.components.v1 as components
 from manage_requests import show_manage_requests
 from communication import show_communication_page
-from database import init_requests_db, create_request
+from database import init_db, create_request
 from search_users import show_search_users
 
 # Initialize database
@@ -51,24 +51,33 @@ if 'registered' not in st.session_state:
 def init_session_state():
     if 'page' not in st.session_state:
         st.session_state.page = "main"
+    if 'db_initialized' not in st.session_state:
+        st.session_state.db_initialized = False
 
 def main():
     init_session_state()
-    init_requests_db()
+    
+    # Initialize database if not already done
+    if not st.session_state.db_initialized:
+        init_db()
+        st.session_state.db_initialized = True
     
     # Add some test data if the table is empty
     if st.session_state.page == "manage_requests":
         conn = sqlite3.connect('registration.db')
         c = conn.cursor()
-        c.execute("SELECT COUNT(*) FROM requests")
-        count = c.fetchone()[0]
-        conn.close()
-        
-        if count == 0:
-            # Add sample requests
-            create_request("Medical Supplies", "user1", "John Doe", "5 km")
-            create_request("Food Aid", "user2", "Jane Smith", "3 km")
-            create_request("Transport", "user3", "Mike Johnson", "1 km")
+        try:
+            c.execute("SELECT COUNT(*) FROM requests")
+            count = c.fetchone()[0]
+            if count == 0:
+                # Add sample requests
+                create_request("Medical Supplies", "user1", "John Doe", "5 km")
+                create_request("Food Aid", "user2", "Jane Smith", "3 km")
+                create_request("Transport", "user3", "Mike Johnson", "1 km")
+        except sqlite3.Error as e:
+            st.error(f"Database error: {e}")
+        finally:
+            conn.close()
     
     # Page routing
     if st.session_state.page == "main":
