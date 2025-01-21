@@ -1,8 +1,11 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
+from components import show_logo
 
 def show_search_users():
+    show_logo()
+    
     st.title("Search Users")
     
     # Search and filter section

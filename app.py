@@ -10,6 +10,10 @@ from manage_requests import show_manage_requests
 from communication import show_communication_page
 from database import DatabaseManager
 from search_users import show_search_users
+from distress_call import show_distress_call
+from edit_profile import show_edit_profile
+from signup_process import show_signup_page, show_resources_page, show_final_page
+import uuid
 
 # Initialize database
 def init_db():
@@ -42,7 +46,7 @@ def init_db():
 
 # Initialize session state variables
 if 'page' not in st.session_state:
-    st.session_state.page = 'main'
+    st.session_state.page = 1 # Start with signup page (page 1)
 if 'user_data' not in st.session_state:
     st.session_state.user_data = {}
 if 'registered' not in st.session_state:
@@ -50,7 +54,7 @@ if 'registered' not in st.session_state:
 
 def init_session_state():
     if 'page' not in st.session_state:
-        st.session_state.page = "main"
+        st.session_state.page = 1  # Changed from "main" to 1
     if 'db_initialized' not in st.session_state:
         st.session_state.db_initialized = False
     if 'user_data' not in st.session_state:
@@ -64,22 +68,59 @@ def main():
         DatabaseManager.init_db()
         st.session_state.db_initialized = True
     
-    # Add some test data if the table is empty
-    if st.session_state.page == "manage_requests":
-        conn = sqlite3.connect('registration.db')
-        c = conn.cursor()
-        try:
-            c.execute("SELECT COUNT(*) FROM requests")
-            count = c.fetchone()[0]
-            if count == 0:
-                # Add sample requests
-                DatabaseManager.create_request("Medical Supplies", "user1", "John Doe", "5 km")
-                DatabaseManager.create_request("Food Aid", "user2", "Jane Smith", "3 km")
-                DatabaseManager.create_request("Transport", "user3", "Mike Johnson", "1 km")
-        except sqlite3.Error as e:
-            st.error(f"Database error: {e}")
-        finally:
-            conn.close()
+    # Check for and add sample requests if none exist
+    conn = sqlite3.connect('registration.db')
+    c = conn.cursor()
+    try:
+        # First check if the requests table exists
+        c.execute('''CREATE TABLE IF NOT EXISTS requests
+                    (id TEXT PRIMARY KEY,
+                     need TEXT,
+                     requester_id TEXT,
+                     requester_name TEXT,
+                     time TIMESTAMP,
+                     status TEXT DEFAULT 'active',
+                     distance TEXT)''')
+        conn.commit()
+        
+        # Check if there are any active requests
+        c.execute("SELECT COUNT(*) FROM requests WHERE status = 'active'")
+        count = c.fetchone()[0]
+        
+        if count == 0:
+            print("No active requests found, adding samples...")
+            # Add sample requests with realistic data
+            sample_requests = [
+                ("Medical Supplies", "Need urgent insulin supplies", "10km"),
+                ("Food Aid", "Require baby formula and diapers", "3km"),
+                ("Transport", "Need transportation to medical facility", "5km"),
+                ("Shelter", "Temporary housing needed for family of 4", "7km"),
+                ("Water", "Clean drinking water needed", "2km")
+            ]
+            
+            for need, notes, distance in sample_requests:
+                try:
+                    DatabaseManager.create_request(
+                        need=need,
+                        requester_id=str(uuid.uuid4()),  # Generate random requester_id
+                        requester_name=f"Sample User {uuid.uuid4().hex[:4]}",  # Generate random name
+                        distance=distance
+                    )
+                    print(f"Added sample request: {need}")
+                except Exception as e:
+                    print(f"Error adding sample request {need}: {str(e)}")
+            
+            print("Finished adding sample requests")
+            
+        # Verify requests were added
+        c.execute("SELECT COUNT(*) FROM requests WHERE status = 'active'")
+        new_count = c.fetchone()[0]
+        print(f"Total active requests in database: {new_count}")
+        
+    except sqlite3.Error as e:
+        print(f"Database error: {e}")
+    finally:
+        conn.close()
     
     # Page routing
     if isinstance(st.session_state.page, int):  # Registration flow
@@ -98,6 +139,10 @@ def main():
             show_manage_requests()
         elif st.session_state.page == "communication":
             show_communication_page()
+        elif st.session_state.page == "distress":
+            show_distress_call()
+        elif st.session_state.page == "edit_profile":
+            show_edit_profile()
 
 def save_registration():
     conn = sqlite3.connect('registration.db')
@@ -118,248 +163,7 @@ def save_registration():
     st.session_state.registered = True
     st.rerun()
 
-def reset_registration():
-    st.session_state.page = 1
-    st.session_state.user_data = {}
-    st.rerun()
 
-def test_database():
-    st.header("Database Test Results")
-    
-    conn = sqlite3.connect('registration.db')
-    c = conn.cursor()
-    
-    # Get all records
-    c.execute("SELECT * FROM users ORDER BY registration_date DESC")
-    records = c.fetchall()
-    conn.close()
-    
-    if records:
-        st.write("### All Registrations")
-        for record in records:
-            st.write("---")
-            st.write(f"**Name:** {record[1]}")
-            st.write(f"**Resources:** {record[2]}")
-            st.write(f"**Services:** {record[3]}")
-            st.write(f"**Registration Date:** {record[4]}")
-    else:
-        st.write("No registrations found in database.")
-
-def delete_all_records():
-    conn = sqlite3.connect('registration.db')
-    c = conn.cursor()
-    c.execute("DELETE FROM users")
-    conn.commit()
-    conn.close()
-    st.rerun()
-
-def get_address_from_coords(lat, lon):
-    try:
-        # Using Nominatim API (free, no API key required)
-        url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
-        response = requests.get(url, headers={'User-Agent': 'myapp/1.0'})
-        if response.status_code == 200:
-            data = response.json()
-            return data.get('display_name', '')
-    except:
-        return ""
-
-def get_user_location():
-    st.write("To get your accurate location, please allow location access if prompted by your browser.")
-    
-    # Add a button to request location
-    if st.button("Share My Location"):
-        components.html(
-            """
-            <script>
-            navigator.geolocation.getCurrentPosition(
-                function(position) {
-                    const lat = position.coords.latitude;
-                    const lon = position.coords.longitude;
-                    window.parent.postMessage({
-                        type: "location",
-                        latitude: lat,
-                        longitude: lon
-                    }, "*");
-                },
-                function(error) {
-                    console.error("Error getting location:", error);
-                }
-            );
-            </script>
-            """,
-            height=0,
-        )
-        
-        # Initialize location_shared state if not exists
-        if 'location_shared' not in st.session_state:
-            st.session_state.location_shared = False
-            
-        # Set location_shared to True when button is clicked
-        st.session_state.location_shared = True
-        st.rerun()
-
-def show_signup_page():
-    st.header("Sign Up")
-    name = st.text_input("Name:", key="name")
-    
-    # Initialize location_shared state if not exists
-    if 'location_shared' not in st.session_state:
-        st.session_state.location_shared = False
-    
-    # Get user's location automatically
-    user_location = get_user_location()
-    
-    # If location was just shared, update address
-    if st.session_state.location_shared:
-        if 'latitude' in st.session_state and 'longitude' in st.session_state:
-            new_address = get_address_from_coords(
-                st.session_state.latitude,
-                st.session_state.longitude
-            )
-            if new_address:
-                st.session_state.address = new_address
-                st.session_state.location_shared = False  # Reset the flag
-                st.rerun()
-    
-    # Initialize map center with Qatar's coordinates as default
-    qatar_center_lat = 25.3548
-    qatar_center_lon = 51.1839
-    
-    # Define Qatar's bounds
-    qatar_bounds = [
-        [24.4539, 50.7571],  # Southwest corner
-        [26.1821, 51.6366]   # Northeast corner
-    ]
-    
-    # Initialize session state with Qatar's coordinates if not set
-    if 'latitude' not in st.session_state:
-        st.session_state.latitude = qatar_center_lat
-    if 'longitude' not in st.session_state:
-        st.session_state.longitude = qatar_center_lon
-    
-    # Get and store address in session state
-    if 'address' not in st.session_state:
-        st.session_state.address = ""
-    
-    # Pre-fill address with detected location
-    address = st.text_input("Address:", 
-                           value=st.session_state.address,
-                           key="address")
-    
-    st.write("📍 **Location Selection:**")
-    st.write("Your location has been automatically detected. You can adjust it by clicking anywhere on the map.")
-    
-    m = folium.Map(
-        location=[st.session_state.latitude, st.session_state.longitude],
-        zoom_start=8,
-        min_zoom=7,
-        max_zoom=13,
-        max_bounds=True,
-        min_lat=qatar_bounds[0][0],
-        max_lat=qatar_bounds[1][0],
-        min_lon=qatar_bounds[0][1],
-        max_lon=qatar_bounds[1][1]
-    )
-    
-    # Add marker for current selection
-    folium.Marker(
-        [st.session_state.latitude, st.session_state.longitude],
-        popup="Selected Location",
-        icon=folium.Icon(color="red")
-    ).add_to(m)
-    
-    # Display the map
-    map_data = st_folium(m, height=400, width=700)
-    
-    # Handle location selection and update address
-    if map_data["last_clicked"]:
-        st.session_state.latitude = map_data["last_clicked"]["lat"]
-        st.session_state.longitude = map_data["last_clicked"]["lng"]
-        # Get address for the new coordinates
-        st.session_state.address = get_address_from_coords(
-            st.session_state.latitude,
-            st.session_state.longitude
-        )
-        st.success("✅ Location selected: {}, {}".format(
-            st.session_state.latitude,
-            st.session_state.longitude
-        ))
-        st.rerun()
-    
-    # Show current coordinates
-    st.info("📍 Current location: {}, {}".format(
-        st.session_state.latitude,
-        st.session_state.longitude
-    ))
-        
-    if st.button("Next"):
-        if name.strip() and address.strip():
-            st.session_state.user_data.update({
-                'name': name,
-                'address': address,
-                'latitude': st.session_state.latitude,
-                'longitude': st.session_state.longitude
-            })
-            st.session_state.page += 1
-            st.rerun()
-        else:
-            st.error("Please fill in all fields")
-
-def show_final_page():
-    st.header("Review and Submit")
-    
-    st.write("Please review your information:")
-    st.write("**Name:** ", st.session_state.user_data.get('name', ''))
-    st.write("**Address:** ", st.session_state.user_data.get('address', ''))
-    st.write("**Resources:** ", st.session_state.user_data.get('resources', ''))
-    st.write("**Services:** ", st.session_state.user_data.get('services', ''))
-    
-    if st.button("Submit"):
-        if DatabaseManager.save_registration(
-            st.session_state.user_data.get('name'),
-            st.session_state.user_data.get('resources'),
-            st.session_state.user_data.get('services'),
-            st.session_state.user_data.get('latitude'),
-            st.session_state.user_data.get('longitude'),
-            st.session_state.user_data.get('address')
-        ):
-            st.success("Registration successful!")
-            st.session_state.page = "main"
-            st.session_state.user_data = {}  # Clear the data
-            st.rerun()
-        else:
-            st.error("Registration failed. Please try again.")
-
-def show_resources_page():
-    st.header("Resources and Services")
-    
-    # Resources selection
-    st.subheader("What resources can you provide?")
-    resources = st.multiselect(
-        "Select resources:",
-        ["Medical Supplies", "Food", "Water", "Shelter", "Clothing", "Transport"],
-        key="resources"
-    )
-    
-    # Services selection
-    st.subheader("What services can you offer?")
-    services = st.multiselect(
-        "Select services:",
-        ["Medical Aid", "Food Distribution", "Transportation", "Housing", "Counseling"],
-        key="services"
-    )
-    
-    if st.button("Next"):
-        if resources or services:  # Allow proceeding if at least one is selected
-            st.session_state.user_data.update({
-                'resources': ','.join(resources),
-                'services': ','.join(services)
-            })
-            st.session_state.page = 3  # Move to final page
-            st.rerun()
-        else:
-            st.error("Please select at least one resource or service")
 
 if __name__ == "__main__":
     main()

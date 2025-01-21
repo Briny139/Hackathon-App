@@ -8,39 +8,30 @@ class DatabaseManager:
         conn = sqlite3.connect('registration.db')
         c = conn.cursor()
         
-        # Create users table if it doesn't exist
-        c.execute('''CREATE TABLE IF NOT EXISTS users
-                     (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                      name TEXT NOT NULL,
-                      resources TEXT,
-                      services TEXT,
-                      latitude REAL,
-                      longitude REAL,
-                      address TEXT,
-                      registration_date TIMESTAMP)''')
-        
-        # Create requests table if it doesn't exist
-        c.execute('''CREATE TABLE IF NOT EXISTS requests
-                     (id TEXT PRIMARY KEY,
-                      need TEXT,
-                      requester_id TEXT,
-                      requester_name TEXT,
-                      time TIMESTAMP,
-                      status TEXT,
-                      distance TEXT)''')
-        
-        # Create messages table if it doesn't exist
-        c.execute('''CREATE TABLE IF NOT EXISTS messages
-                     (id TEXT PRIMARY KEY,
-                      request_id TEXT,
-                      sender_id TEXT,
-                      sender_name TEXT,
-                      message TEXT,
-                      timestamp TIMESTAMP,
-                      FOREIGN KEY(request_id) REFERENCES requests(id))''')
-        
-        conn.commit()
-        conn.close()
+        try:
+            # Drop the existing table
+            c.execute('DROP TABLE IF EXISTS users')
+            conn.commit()
+            print("Dropped existing users table")
+            
+            # Create new table with all required columns
+            c.execute('''CREATE TABLE users
+                         (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                          user_id TEXT UNIQUE NOT NULL,
+                          name TEXT NOT NULL,
+                          resources TEXT,
+                          services TEXT,
+                          latitude REAL,
+                          longitude REAL,
+                          address TEXT,
+                          registration_date TIMESTAMP)''')
+            conn.commit()
+            print("Created new users table with correct schema")
+            
+        except sqlite3.Error as e:
+            print(f"Database initialization error: {e}")
+        finally:
+            conn.close()
 
     @staticmethod
     def save_registration(name, resources, services, latitude, longitude, address):
@@ -49,15 +40,29 @@ class DatabaseManager:
         
         try:
             current_time = datetime.now()
+            user_id = str(uuid.uuid4())  # Generate unique user ID
+            
+            # Debug prints
+            print(f"Attempting to save registration with:")
+            print(f"user_id: {user_id}")
+            print(f"name: {name}")
+            print(f"resources: {resources}")
+            print(f"services: {services}")
+            print(f"latitude: {latitude}")
+            print(f"longitude: {longitude}")
+            print(f"address: {address}")
+            print(f"time: {current_time}")
+            
             c.execute('''INSERT INTO users 
-                         (name, resources, services, latitude, longitude, address, registration_date)
-                         VALUES (?, ?, ?, ?, ?, ?, ?)''',
-                      (name, resources, services, latitude, longitude, address, current_time))
+                         (user_id, name, resources, services, latitude, longitude, address, registration_date)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+                      (user_id, name, resources, services, latitude, longitude, address, current_time))
             conn.commit()
-            return True
+            print(f"Registration successful with user_id: {user_id}")
+            return user_id
         except sqlite3.Error as e:
             print(f"Database error: {e}")
-            return False
+            return None
         finally:
             conn.close()
 
@@ -66,16 +71,27 @@ class DatabaseManager:
         conn = sqlite3.connect('registration.db')
         c = conn.cursor()
         
-        request_id = str(uuid.uuid4())
-        current_time = datetime.now()
-        
-        c.execute('''INSERT INTO requests (id, need, requester_id, requester_name, time, status, distance)
-                     VALUES (?, ?, ?, ?, ?, ?, ?)''',
-                  (request_id, need, requester_id, requester_name, current_time, "active", distance))
-        
-        conn.commit()
-        conn.close()
-        return request_id
+        try:
+            request_id = str(uuid.uuid4())
+            current_time = datetime.now()
+            
+            print(f"Creating request with ID: {request_id}")
+            print(f"Need: {need}")
+            print(f"Requester: {requester_name}")
+            
+            c.execute('''INSERT INTO requests 
+                         (id, need, requester_id, requester_name, time, status, distance)
+                         VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                      (request_id, need, requester_id, requester_name, current_time, "active", distance))
+            
+            conn.commit()
+            print(f"Successfully created request {request_id}")
+            return request_id
+        except sqlite3.Error as e:
+            print(f"Database error in create_request: {e}")
+            return None
+        finally:
+            conn.close()
 
     @staticmethod
     def get_all_requests():
@@ -161,4 +177,45 @@ class DatabaseManager:
         c.execute('''UPDATE requests SET status = "completed" WHERE id = ?''', (request_id,))
         
         conn.commit()
-        conn.close() 
+        conn.close()
+
+    @staticmethod
+    def get_user_details(user_id):
+        conn = sqlite3.connect('registration.db')
+        c = conn.cursor()
+        try:
+            c.execute('''SELECT name, resources, services, latitude, longitude, address 
+                         FROM users WHERE user_id = ?''', (user_id,))
+            result = c.fetchone()
+            if result:
+                return {
+                    'name': result[0],
+                    'resources': result[1],
+                    'services': result[2],
+                    'latitude': result[3],
+                    'longitude': result[4],
+                    'address': result[5]
+                }
+            return {}
+        except sqlite3.Error as e:
+            print(f"Database error: {e}")
+            return {}
+        finally:
+            conn.close()
+
+    @staticmethod
+    def update_profile(user_id, name, resources, services):
+        conn = sqlite3.connect('registration.db')
+        c = conn.cursor()
+        try:
+            c.execute('''UPDATE users 
+                         SET name = ?, resources = ?, services = ?
+                         WHERE user_id = ?''',
+                      (name, resources, services, user_id))
+            conn.commit()
+            return True
+        except sqlite3.Error as e:
+            print(f"Database error: {e}")
+            return False
+        finally:
+            conn.close() 

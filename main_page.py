@@ -44,7 +44,7 @@ def show_map_section():
     # Get all users with locations from database
     conn = sqlite3.connect('registration.db')
     df = pd.read_sql_query("""
-        SELECT name, latitude, longitude, resources, services
+        SELECT user_id, name, latitude, longitude, resources, services
         FROM users
         WHERE latitude IS NOT NULL
     """, conn)
@@ -73,14 +73,21 @@ def show_map_section():
         max_lon=qatar_bounds[1][1]
     )
     
+    # Get current user's ID from session state
+    current_user_id = st.session_state.user_data.get('user_id')
+    
     # Add markers for each user
     for idx, row in df.iterrows():
-        # Regular members (black circles)
-        if 'distress' not in str(row['services']).lower():
-            color = 'black'
-        # Distress calls (red circles)
-        else:
+        # Check if this is the current user
+        if row['user_id'] == current_user_id:
+            # Current user (blue circle)
+            color = 'blue'
+        elif 'distress' in str(row['services']).lower():
+            # Distress calls (red circles)
             color = 'red'
+        else:
+            # Regular members (black circles)
+            color = 'black'
             
         folium.CircleMarker(
             location=[row['latitude'], row['longitude']],
@@ -113,7 +120,7 @@ def show_admin_controls():
     
     with col2:
         if st.button("View All Registrations"):
-            show_all_registrations()
+            test_database()
     
     with col3:
         if st.button("Delete All Records"):
@@ -154,3 +161,25 @@ def delete_all_records():
     conn.close()
     st.success("All records deleted successfully!")
     st.rerun() 
+
+def test_database():
+    st.header("Database Test Results")
+    
+    conn = sqlite3.connect('registration.db')
+    c = conn.cursor()
+    
+    # Get all records
+    c.execute("SELECT * FROM users ORDER BY registration_date DESC")
+    records = c.fetchall()
+    conn.close()
+    
+    if records:
+        st.write("### All Registrations")
+        for record in records:
+            st.write("---")
+            st.write(f"**Name:** {record[1]}")
+            st.write(f"**Resources:** {record[2]}")
+            st.write(f"**Services:** {record[3]}")
+            st.write(f"**Registration Date:** {record[4]}")
+    else:
+        st.write("No registrations found in database.")
