@@ -13,7 +13,7 @@ allocate local resources and services instead of waiting for external organisati
 
 ## Installation
 - Cloning the repository
-  `https://github.com/Briny139/Hackathon-App.git`
+  `git clone -b complete --single-branch https://github.com/Briny139/Hackathon-App.git`
 - Navigate into the project directory:
    `cd Hackathon-App`
 - Install dependencies
