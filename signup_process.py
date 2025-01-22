@@ -3,10 +3,7 @@ from database import DatabaseManager
 import requests
 import folium
 from streamlit_folium import st_folium
-import sqlite3
-from datetime import datetime
 import streamlit.components.v1 as components
-import time
 
 
 def check_stored_location():
@@ -56,7 +53,7 @@ def reset_registration():
 
 def get_address_from_coords(lat, lon):
     try:
-        # Using Nominatim API (free, no API key required)
+        # Using Nominatim API 
         url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
         response = requests.get(url, headers={'User-Agent': 'myapp/1.0'})
         if response.status_code == 200:
@@ -70,7 +67,7 @@ def get_user_location():
     
     if st.button("Get My Location"):
         try:
-            # Using ipapi.co (free tier, no API key needed)
+            # Using ipapi.co API
             response = requests.get('https://ipapi.co/json/')
             if response.status_code == 200:
                 data = response.json()
@@ -98,20 +95,18 @@ def get_user_location():
                 st.error("Could not fetch location. Please try again later.")
         except Exception as e:
             st.error(f"Error getting location: {str(e)}")
-    
-    return st.session_state.get('latitude'), st.session_state.get('longitude')
 
 def show_signup_page():
     check_stored_location()
     st.header("Sign Up")
-    name = st.text_input("Name:", key="name")
+    name = st.text_input("Name:", key="name", kwargs = {"autocomplete": "off"})
     
     # Initialize location_shared state if not exists
     if 'location_shared' not in st.session_state:
         st.session_state.location_shared = False
     
     # Get user's location automatically
-    user_location = get_user_location()
+    get_user_location()
     
     # Initialize Qatar's coordinates
     qatar_center_lat = 25.3548
@@ -266,28 +261,3 @@ def show_final_page():
             st.rerun()
         else:
             st.error("Registration failed. Please try again.")
-
-# Add this function to handle the location callback
-def handle_location_callback():
-    components.html(
-        """
-        <script>
-        window.addEventListener('message', function(e) {
-            if (e.data.type === 'location_update') {
-                const lat = e.data.latitude;
-                const lon = e.data.longitude;
-                if (lat && lon) {
-                    window.parent.postMessage({
-                        type: 'streamlit:setComponentValue',
-                        value: {
-                            latitude: lat,
-                            longitude: lon
-                        }
-                    }, '*');
-                }
-            }
-        });
-        </script>
-        """,
-        height=0
-    )

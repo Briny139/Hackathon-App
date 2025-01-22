@@ -1,9 +1,59 @@
 import streamlit as st
 from database import DatabaseManager
 from components import show_logo
+import sqlite3
+import uuid
+
+def add_sample_requests():
+    # Check for and add sample requests if none exist
+    conn = sqlite3.connect('registration.db')
+    c = conn.cursor()
+    try:
+        # Check if there are any active requests
+        c.execute("SELECT COUNT(*) FROM requests WHERE status = 'active'")
+        count = c.fetchone()[0]
+        
+        if count == 0:
+            print("No active requests found, adding samples...")
+            # Add sample requests with realistic data
+            sample_requests = [
+                ("Medical Supplies", "Need urgent insulin supplies", "10km"),
+                ("Food Aid", "Require baby formula and diapers", "3km"),
+                ("Transport", "Need transportation to medical facility", "5km"),
+                ("Shelter", "Temporary housing needed for family of 4", "7km"),
+                ("Water", "Clean drinking water needed", "2km")
+            ]
+            
+            for need, notes, distance in sample_requests:
+                try:
+                    DatabaseManager.create_request(
+                        need=need,
+                        requester_id=str(uuid.uuid4()),  # Generate random requester_id
+                        requester_name=f"Sample User {uuid.uuid4().hex[:4]}",  # Generate random name
+                        distance=distance
+                    )
+                    print(f"Added sample request: {need}")
+                except Exception as e:
+                    print(f"Error adding sample request {need}: {str(e)}")
+            
+            print("Finished adding sample requests")
+            
+        # Verify requests were added
+        c.execute("SELECT COUNT(*) FROM requests WHERE status = 'active'")
+        new_count = c.fetchone()[0]
+        print(f"Total active requests in database: {new_count}")
+        
+    except sqlite3.Error as e:
+        print(f"Database error: {e}")
+    finally:
+        conn.close()
 
 def show_manage_requests():
     show_logo()
+
+    #adding sample requests if there are none
+    add_sample_requests()
+
     # Add custom CSS for styling
     st.markdown("""
         <style>

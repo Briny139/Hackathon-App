@@ -9,6 +9,17 @@ class DatabaseManager:
         c = conn.cursor()
         
         try:
+            # Create requests table
+            c.execute('''CREATE TABLE IF NOT EXISTS requests
+                         (id TEXT PRIMARY KEY,
+                          need TEXT,
+                          requester_id TEXT,
+                          requester_name TEXT,
+                          time TIMESTAMP,
+                          status TEXT DEFAULT 'active',
+                          distance TEXT)''')
+            conn.commit()
+            
             # Create messages table
             c.execute('''CREATE TABLE IF NOT EXISTS messages
                          (id TEXT PRIMARY KEY,
@@ -18,7 +29,6 @@ class DatabaseManager:
                           message TEXT NOT NULL,
                           timestamp TIMESTAMP)''')
             conn.commit()
-            print("Created messages table")
             
             # Create users table
             c.execute('''CREATE TABLE IF NOT EXISTS users
@@ -32,13 +42,28 @@ class DatabaseManager:
                           address TEXT,
                           registration_date TIMESTAMP)''')
             conn.commit()
-            print("Created users table")
             
         except sqlite3.Error as e:
             print(f"Database initialization error: {e}")
         finally:
             conn.close()
 
+    @classmethod
+    def clear_all_tables(cls):
+        #Clear all data from all tables
+        try:
+            with cls.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM messages")
+                cursor.execute("DELETE FROM requests")
+                cursor.execute("DELETE FROM users")
+                print("All tables cleared successfully")
+                conn.commit()
+                return True
+        except Exception as e:
+            print(f"Error clearing all tables: {e}")
+            return False
+        
     @staticmethod
     def save_registration(name, resources, services, latitude, longitude, address):
         conn = sqlite3.connect('registration.db')
@@ -48,17 +73,6 @@ class DatabaseManager:
             current_time = datetime.now()
             user_id = str(uuid.uuid4())  # Generate unique user ID
             
-            # Debug prints
-            print(f"Attempting to save registration with:")
-            print(f"user_id: {user_id}")
-            print(f"name: {name}")
-            print(f"resources: {resources}")
-            print(f"services: {services}")
-            print(f"latitude: {latitude}")
-            print(f"longitude: {longitude}")
-            print(f"address: {address}")
-            print(f"time: {current_time}")
-            
             c.execute('''INSERT INTO users 
                          (user_id, name, resources, services, latitude, longitude, address, registration_date)
                          VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
@@ -66,9 +80,11 @@ class DatabaseManager:
             conn.commit()
             print(f"Registration successful with user_id: {user_id}")
             return user_id
+        
         except sqlite3.Error as e:
             print(f"Database error: {e}")
             return None
+        
         finally:
             conn.close()
 
@@ -81,17 +97,12 @@ class DatabaseManager:
             request_id = str(uuid.uuid4())
             current_time = datetime.now()
             
-            print(f"Creating request with ID: {request_id}")
-            print(f"Need: {need}")
-            print(f"Requester: {requester_name}")
-            
             c.execute('''INSERT INTO requests 
                          (id, need, requester_id, requester_name, time, status, distance)
                          VALUES (?, ?, ?, ?, ?, ?, ?)''',
                       (request_id, need, requester_id, requester_name, current_time, "active", distance))
             
             conn.commit()
-            print(f"Successfully created request {request_id}")
             return request_id
         except sqlite3.Error as e:
             print(f"Database error in create_request: {e}")
@@ -224,4 +235,5 @@ class DatabaseManager:
             print(f"Database error: {e}")
             return False
         finally:
-            conn.close() 
+            conn.close()
+

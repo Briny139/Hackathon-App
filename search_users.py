@@ -65,7 +65,8 @@ def show_search_users():
     conn = sqlite3.connect('registration.db')
     query = """
         SELECT name, resources, services, 
-               latitude, longitude
+               latitude, longitude,
+               '5km' as distance  -- Add default distance
         FROM users
         WHERE 1=1
     """
@@ -77,20 +78,34 @@ def show_search_users():
     
     # Apply resource filters
     if st.session_state.resource_filter:
-        resource_conditions = []
+        placeholders = []
         for resource in st.session_state.resource_filter:
-            resource_conditions.append("resources LIKE ?")
+            placeholders.append("resources LIKE ?")
             params.append(f"%{resource}%")
-        query += f" AND ({' OR '.join(resource_conditions)})"
+        if placeholders:
+            query += f" AND ({' OR '.join(placeholders)})"
     
     # Apply service filters
     if st.session_state.service_filter:
-        service_conditions = []
+        placeholders = []
         for service in st.session_state.service_filter:
-            service_conditions.append("services LIKE ?")
+            placeholders.append("services LIKE ?")
             params.append(f"%{service}%")
-        query += f" AND ({' OR '.join(service_conditions)})"
+        if placeholders:
+            query += f" AND ({' OR '.join(placeholders)})"
     
+    # Apply simple distance filter
+    if st.session_state.distance_filter != "All":
+        if st.session_state.distance_filter == "Within 5km":
+            query += " AND distance <= '5km'"
+        elif st.session_state.distance_filter == "5-10km":
+            query += " AND distance > '5km'"
+        elif st.session_state.distance_filter == "10-20km":
+            query += " AND distance > '10km'"
+        else:  # "20km+"
+            query += " AND distance > '20km'"
+    
+    # Execute query with all parameters
     df = pd.read_sql_query(query, conn, params=params)
     conn.close()
     

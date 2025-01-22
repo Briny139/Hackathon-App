@@ -31,6 +31,7 @@ def show_communication_page():
             z-index: 1000;
         }
         .chat-container {
+            background-color: #E9ECEF;
             height: 200px;  /* Reduced from 300px */
             overflow-y: auto;
             margin-bottom: 60px;  /* Reduced margin */
@@ -56,12 +57,11 @@ def show_communication_page():
         /* Reduce spacing around paragraphs */
         p {
             margin: 0.3rem 0;
-        }
         </style>
     """, unsafe_allow_html=True)
     
     show_logo()
-    
+        
     if 'active_request' not in st.session_state:
         st.error("No active request found")
         if st.button("Back to Requests"):
@@ -69,7 +69,7 @@ def show_communication_page():
             st.rerun()
         return
     
-    # Header with request info (more compact)
+    # Header with request info 
     st.markdown(f"## 🆘 {st.session_state.active_request['need']}")  # Changed from title to h2
     
     col1, col2, col3 = st.columns([2, 1, 1])
@@ -85,31 +85,26 @@ def show_communication_page():
         st.markdown(f'<p class="distance-text">**📍 {st.session_state.active_request["distance"]}**</p>', 
                    unsafe_allow_html=True)
     
-    # Chat section (more compact)
+    # Chat section 
     st.markdown("### Chat")
-    chat_container = st.container()
-    with chat_container:
-        st.markdown('<div class="chat-container">', unsafe_allow_html=True)
-        messages = DatabaseManager.get_messages(st.session_state.active_request['id'])
-        
-        for msg in messages:
-            is_user = msg["sender"] == st.session_state.user_data.get('name')
-            message_class = "user-message" if is_user else "other-message"
-            sender = "You" if is_user else msg["sender"]
-            
-            st.markdown(
-                f'<div class="chat-message {message_class}">'
-                f'<strong>{sender}:</strong> {msg["message"]}'
-                f'</div>',
-                unsafe_allow_html=True
-            )
-        st.markdown('</div>', unsafe_allow_html=True)
     
-    # Fixed position message input (more compact)
+    # Create a container with fixed height for messages
+    messages_container = st.container()
+    
+    # Fixed position message input
     st.markdown('<div class="message-input-container">', unsafe_allow_html=True)
     col1, col2 = st.columns([6, 1])
     with col1:
-        message = st.text_input("Type your message...", key="message_input", label_visibility="collapsed")
+        message = st.text_input("Type your message...", 
+                              key="message_input", 
+                              label_visibility="collapsed",
+                              kwargs={
+                                  "autocomplete": "off",
+                                  "autocorrect": "off",
+                                  "autocapitalize": "off",
+                                  "spellcheck": "false",
+                                  "data-form-type": "other"
+                              })
     with col2:
         if st.button("📤", key="send_button", use_container_width=True) and message.strip():
             DatabaseManager.save_message(
@@ -121,6 +116,29 @@ def show_communication_page():
             st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
     
+    # Display messages in the fixed container
+    with messages_container:
+        messages = DatabaseManager.get_messages(st.session_state.active_request['id'])
+        
+        # Build all messages HTML first
+        messages_html = ""
+        for msg in messages:
+            is_user = msg["sender"] == st.session_state.user_data.get('name')
+            message_class = "user-message" if is_user else "other-message"
+            sender = "You" if is_user else msg["sender"]
+            
+            messages_html += (
+                f'<div class="chat-message {message_class}">'
+                f'<strong>{sender}:</strong> {msg["message"]}'
+                f'</div>'
+            )
+        
+        # Display all messages within the chat container
+        st.markdown(
+            f'<div class="chat-container">{messages_html}</div>',
+            unsafe_allow_html=True
+        )
+    
     # Back button
     if st.button("← Back to Requests"):
         st.session_state.page = "manage_requests"
@@ -129,3 +147,4 @@ def show_communication_page():
         if 'recipient' in st.session_state:
             del st.session_state.recipient
         st.rerun() 
+    
