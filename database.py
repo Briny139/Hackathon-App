@@ -9,13 +9,19 @@ class DatabaseManager:
         c = conn.cursor()
         
         try:
-            # Drop the existing table
-            c.execute('DROP TABLE IF EXISTS users')
+            # Create messages table
+            c.execute('''CREATE TABLE IF NOT EXISTS messages
+                         (id TEXT PRIMARY KEY,
+                          request_id TEXT NOT NULL,
+                          sender_id TEXT NOT NULL,
+                          sender_name TEXT NOT NULL,
+                          message TEXT NOT NULL,
+                          timestamp TIMESTAMP)''')
             conn.commit()
-            print("Dropped existing users table")
+            print("Created messages table")
             
-            # Create new table with all required columns
-            c.execute('''CREATE TABLE users
+            # Create users table
+            c.execute('''CREATE TABLE IF NOT EXISTS users
                          (id INTEGER PRIMARY KEY AUTOINCREMENT,
                           user_id TEXT UNIQUE NOT NULL,
                           name TEXT NOT NULL,
@@ -26,7 +32,7 @@ class DatabaseManager:
                           address TEXT,
                           registration_date TIMESTAMP)''')
             conn.commit()
-            print("Created new users table with correct schema")
+            print("Created users table")
             
         except sqlite3.Error as e:
             print(f"Database initialization error: {e}")

@@ -108,7 +108,7 @@ def show_map_section():
     with col2:
         st.markdown("🔴 Distress Call")
     with col3:
-        st.markdown("🔷 You")
+        st.markdown("🔵 You")
 
 def show_admin_controls():
     col1, col2, col3 = st.columns(3)

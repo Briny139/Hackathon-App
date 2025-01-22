@@ -8,6 +8,14 @@ def show_search_users():
     
     st.title("Search Users")
     
+    # Initialize session state for filters if not exists
+    if 'resource_filter' not in st.session_state:
+        st.session_state.resource_filter = []
+    if 'service_filter' not in st.session_state:
+        st.session_state.service_filter = []
+    if 'distance_filter' not in st.session_state:
+        st.session_state.distance_filter = "All"
+    
     # Search and filter section
     col1, col2 = st.columns([2, 1])
     
@@ -23,29 +31,35 @@ def show_search_users():
         with st.sidebar:
             st.header("Filters")
             
-            # Resource filter
-            st.subheader("Resource")
-            resource_filter = st.selectbox(
-                "Select Resource",
-                options=["All", "Medical Supplies", "Food", "Transport", "Shelter"],
-                key="resource_filter"
+            # Resource filter (multiple selection)
+            st.subheader("Resources")
+            resource_filter = st.multiselect(
+                "Select Resources",
+                options=["Medical Supplies", "Food", "Transport", "Shelter"],
+                default=st.session_state.resource_filter,
+                key="resource_multiselect"
             )
+            st.session_state.resource_filter = resource_filter
             
-            # Service filter
-            st.subheader("Service")
-            service_filter = st.selectbox(
-                "Select Service",
-                options=["All", "Medical Aid", "Food Distribution", "Transportation", "Housing"],
-                key="service_filter"
+            # Service filter (multiple selection)
+            st.subheader("Services")
+            service_filter = st.multiselect(
+                "Select Services",
+                options=["Medical Aid", "Food Distribution", "Transportation", "Housing"],
+                default=st.session_state.service_filter,
+                key="service_multiselect"
             )
+            st.session_state.service_filter = service_filter
             
             # Distance filter
             st.subheader("Distance")
             distance_filter = st.selectbox(
                 "Select Distance",
                 options=["All", "Within 5km", "5-10km", "10-20km", "20km+"],
-                key="distance_filter"
+                index=["All", "Within 5km", "5-10km", "10-20km", "20km+"].index(st.session_state.distance_filter),
+                key="distance_select"
             )
+            st.session_state.distance_filter = distance_filter
     
     # Get users from database
     conn = sqlite3.connect('registration.db')
@@ -61,13 +75,21 @@ def show_search_users():
         query += " AND name LIKE ?"
         params.append(f"%{search_query}%")
     
-    if show_filters:
-        if resource_filter != "All":
-            query += " AND resources LIKE ?"
-            params.append(f"%{resource_filter}%")
-        if service_filter != "All":
-            query += " AND services LIKE ?"
-            params.append(f"%{service_filter}%")
+    # Apply resource filters
+    if st.session_state.resource_filter:
+        resource_conditions = []
+        for resource in st.session_state.resource_filter:
+            resource_conditions.append("resources LIKE ?")
+            params.append(f"%{resource}%")
+        query += f" AND ({' OR '.join(resource_conditions)})"
+    
+    # Apply service filters
+    if st.session_state.service_filter:
+        service_conditions = []
+        for service in st.session_state.service_filter:
+            service_conditions.append("services LIKE ?")
+            params.append(f"%{service}%")
+        query += f" AND ({' OR '.join(service_conditions)})"
     
     df = pd.read_sql_query(query, conn, params=params)
     conn.close()
@@ -75,7 +97,7 @@ def show_search_users():
     # Display results
     if not df.empty:
         for _, row in df.iterrows():
-            with st.container():
+            with st.container(border=True):
                 col1, col2 = st.columns([1, 2])
                 
                 with col1:
@@ -96,7 +118,6 @@ def show_search_users():
                     # Display services in blue
                     for service in services:
                         st.markdown(f"<span style='color: blue;'>[{service.strip()}]</span>", unsafe_allow_html=True)
-                
-                st.divider()
     else:
-        st.info("No users found matching your criteria") 
+        st.info("No users found matching your criteria")
+

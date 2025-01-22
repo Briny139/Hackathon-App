@@ -46,7 +46,7 @@ def init_db():
 
 # Initialize session state variables
 if 'page' not in st.session_state:
-    st.session_state.page = 1 # Start with signup page (page 1)
+    st.session_state.page = "search_users" # Start with signup page (page 1)
 if 'user_data' not in st.session_state:
     st.session_state.user_data = {}
 if 'registered' not in st.session_state:
@@ -54,7 +54,7 @@ if 'registered' not in st.session_state:
 
 def init_session_state():
     if 'page' not in st.session_state:
-        st.session_state.page = 1  # Changed from "main" to 1
+        st.session_state.page = "search_users" # Changed from "main" to 1
     if 'db_initialized' not in st.session_state:
         st.session_state.db_initialized = False
     if 'user_data' not in st.session_state:
